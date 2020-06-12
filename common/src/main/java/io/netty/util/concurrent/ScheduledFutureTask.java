@@ -25,15 +25,23 @@ import java.util.concurrent.TimeUnit;
 
 @SuppressWarnings("ComparableImplementedButEqualsNotOverridden")
 final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFuture<V>, PriorityQueueNode {
+    // 定时任务时间起点 任何定时调度任务都是基于这个时间
+    // 时间起点为ScheduledFutureTask类第一次被类加载器加载的时间。
     private static final long START_TIME = System.nanoTime();
 
+    // 获得当前时间，这个是相对 START_TIME
     static long nanoTime() {
         return System.nanoTime() - START_TIME;
     }
 
+    /**
+     * @param delay 延迟时长，单位：纳秒
+     * @return 获得任务执行时间，也是相对 {@link #START_TIME} 来算的。
+     *          实际上，返回的结果，会用于 {@link #deadlineNanos} 字段
+     */
     static long deadlineNanos(long delay) {
         long deadlineNanos = nanoTime() + delay;
-        // Guard against overflow
+        // Guard against overflow 防止溢出
         return deadlineNanos < 0 ? Long.MAX_VALUE : deadlineNanos;
     }
 
@@ -45,6 +53,15 @@ final class ScheduledFutureTask<V> extends PromiseTask<V> implements ScheduledFu
     private long id;
 
     private long deadlineNanos;
+    /**
+     * 任务执行周期
+     *
+     * =0 - 只执行一次
+     * >0 - 按照计划执行时间计算
+     * <0 - 按照实际执行时间计算
+     *
+     * 推荐阅读文章 https://blog.csdn.net/gtuu0123/article/details/6040159
+     */
     /* 0 - no repeat, >0 - repeat at fixed rate, <0 - repeat with fixed delay */
     private final long periodNanos;
 

@@ -30,10 +30,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public abstract class MultithreadEventExecutorGroup extends AbstractEventExecutorGroup {
 
+    // 线程池，数组形式可知为固定线程池
     private final EventExecutor[] children;
+    // 不可变( 只读 )的 EventExecutor 数组
     private final Set<EventExecutor> readonlyChildren;
+    // 终止的线程个数
     private final AtomicInteger terminatedChildren = new AtomicInteger();
+    // 线程池终止时的异步结果
     private final Promise<?> terminationFuture = new DefaultPromise(GlobalEventExecutor.INSTANCE);
+    // 线程选择器
     private final EventExecutorChooserFactory.EventExecutorChooser chooser;
 
     /**
@@ -81,6 +86,7 @@ public abstract class MultithreadEventExecutorGroup extends AbstractEventExecuto
         for (int i = 0; i < nThreads; i ++) {
             boolean success = false;
             try {
+                // 使用模板方法newChild实例化一个线程
                 children[i] = newChild(executor, args);
                 success = true;
             } catch (Exception e) {

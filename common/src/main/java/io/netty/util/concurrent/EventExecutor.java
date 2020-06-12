@@ -26,6 +26,8 @@ public interface EventExecutor extends EventExecutorGroup {
 
     /**
      * Returns a reference to itself.
+     * 选择一个 EventExecutor 对象
+     * 单线程EventExecutor {@link }
      */
     @Override
     EventExecutor next();

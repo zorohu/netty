@@ -25,6 +25,11 @@ final class DefaultSelectStrategy implements SelectStrategy {
 
     private DefaultSelectStrategy() { }
 
+    /**
+     * 当 hasTasks 为 true ，表示当前已经有任务，
+     * 所以调用 IntSupplier#get() 方法，
+     * 返回当前 Channel 新增的 IO 就绪事件的数量
+     */
     @Override
     public int calculateStrategy(IntSupplier selectSupplier, boolean hasTasks) throws Exception {
         return hasTasks ? selectSupplier.get() : SelectStrategy.SELECT;

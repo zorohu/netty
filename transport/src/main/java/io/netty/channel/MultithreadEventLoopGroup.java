@@ -36,6 +36,7 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
 
     private static final int DEFAULT_EVENT_LOOP_THREADS;
 
+    // 默认情况，线程数最小为1，如果配置了系统参数io.netty.eventLoopThreads，设置为该系统参数值，否则设置为核心数的2倍。
     static {
         DEFAULT_EVENT_LOOP_THREADS = Math.max(1, SystemPropertyUtil.getInt(
                 "io.netty.eventLoopThreads", NettyRuntime.availableProcessors() * 2));
@@ -81,6 +82,7 @@ public abstract class MultithreadEventLoopGroup extends MultithreadEventExecutor
     @Override
     protected abstract EventLoop newChild(Executor executor, Object... args) throws Exception;
 
+    // 将通道channel注册到EventLoopGroup中的一个线程上
     @Override
     public ChannelFuture register(Channel channel) {
         return next().register(channel);
