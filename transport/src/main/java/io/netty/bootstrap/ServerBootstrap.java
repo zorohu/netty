@@ -195,6 +195,12 @@ public class ServerBootstrap extends AbstractBootstrap<ServerBootstrap, ServerCh
             };
         }
 
+        /**
+         * 在AbstractChannelHandlerContext#invokeChannelRead方法中会调用，
+         * 将客户端的 Netty NioSocketChannel 注册到 EventLoop 上
+         * @param ctx
+         * @param msg
+         */
         @Override
         @SuppressWarnings("unchecked")
         public void channelRead(ChannelHandlerContext ctx, Object msg) {

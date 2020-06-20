@@ -49,8 +49,8 @@ public final class EchoServer {
         }
 
         // Configure the server.
-        EventLoopGroup bossGroup = new NioEventLoopGroup(1);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        EventLoopGroup bossGroup = new NioEventLoopGroup(1);    //在netty源码中体现为 parentGroup
+        EventLoopGroup workerGroup = new NioEventLoopGroup();           //在netty源码中体现为 childGroup
         final EchoServerHandler serverHandler = new EchoServerHandler();
         try {
             ServerBootstrap b = new ServerBootstrap();

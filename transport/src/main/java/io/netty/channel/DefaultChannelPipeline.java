@@ -47,9 +47,19 @@ public class DefaultChannelPipeline implements ChannelPipeline {
 
     static final InternalLogger logger = InternalLoggerFactory.getInstance(DefaultChannelPipeline.class);
 
+    /**
+     * {@link #head} 的名字
+     */
     private static final String HEAD_NAME = generateName0(HeadContext.class);
+    /**
+     * {@link #tail} 的名字
+     */
     private static final String TAIL_NAME = generateName0(TailContext.class);
 
+    /**
+     * 名字({@link AbstractChannelHandlerContext#name })缓存 ，基于 ThreadLocal ，用于生成在线程中唯一的名字。
+     * 注意这里使用的是Weak（弱引用）
+     */
     private static final FastThreadLocal<Map<Class<?>, String>> nameCaches =
             new FastThreadLocal<Map<Class<?>, String>>() {
         @Override
@@ -61,16 +71,33 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     private static final AtomicReferenceFieldUpdater<DefaultChannelPipeline, MessageSizeEstimator.Handle> ESTIMATOR =
             AtomicReferenceFieldUpdater.newUpdater(
                     DefaultChannelPipeline.class, MessageSizeEstimator.Handle.class, "estimatorHandle");
+    // 双向链表头
     final AbstractChannelHandlerContext head;
+    // 双向链表尾
     final AbstractChannelHandlerContext tail;
-
+    // 对应Channel 1-1 pipline
     private final Channel channel;
+    // 成功的 Promise 对象
     private final ChannelFuture succeededFuture;
+    /**
+     * 不进行通知的 Promise 对象
+     *
+     * 用于一些方法执行，需要传入 Promise 类型的方法参数，但是不需要进行通知，就传入该值
+     *
+     * @see io.netty.channel.AbstractChannel.AbstractUnsafe#safeSetSuccess(ChannelPromise)
+     */
     private final VoidChannelPromise voidPromise;
     private final boolean touch = ResourceLeakDetector.isEnabled();
-
+    /**
+     * 子执行器集合。
+     *
+     * 默认情况下，ChannelHandler 使用 Channel 所在的 EventLoop 作为执行器。
+     * 但是如果有需要，也可以自定义执行器。详细解析，见 {@link #childExecutor(EventExecutorGroup)} 。
+     * 实际情况下，基本不会用到。和基友【闪电侠】沟通过。
+     */
     private Map<EventExecutorGroup, EventExecutor> childExecutors;
     private volatile MessageSizeEstimator.Handle estimatorHandle;
+    // channel 首次注册标志
     private boolean firstRegistration = true;
 
     /**
@@ -80,12 +107,14 @@ public class DefaultChannelPipeline implements ChannelPipeline {
      * We only keep the head because it is expected that the list is used infrequently and its size is small.
      * Thus full iterations to do insertions is assumed to be a good compromised to saving memory and tail management
      * complexity.
+     * 准备添加 ChannelHandler 的回调
      */
     private PendingHandlerCallback pendingHandlerCallbackHead;
 
     /**
      * Set to {@code true} once the {@link AbstractChannel} is registered.Once set to {@code true} the value will never
      * change.
+     * Channel 是否已注册  注册到EventLoop标记，该值一旦设置为true后不再改变
      */
     private boolean registered;
 
@@ -199,27 +228,36 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     public final ChannelPipeline addLast(EventExecutorGroup group, String name, ChannelHandler handler) {
         final AbstractChannelHandlerContext newCtx;
         synchronized (this) {
+            // 检查是否有重复 handler
             checkMultiplicity(handler);
 
+            // 创建节点名
+            // 创建节点
             newCtx = newContext(group, filterName(name, handler), handler);
 
+            // 添加节点
             addLast0(newCtx);
 
+            // <1> pipeline 暂未注册，添加回调。再注册完成后，执行回调。详细解析，见 {@link #invokeHandlerAddedIfNeeded} 方法。
             // If the registered is false it means that the channel was not registered on an eventLoop yet.
             // In this case we add the context to the pipeline and add a task that will call
             // ChannelHandler.handlerAdded(...) once the channel is registered.
             if (!registered) {
+                // 设置 AbstractChannelHandlerContext 准备添加中
                 newCtx.setAddPending();
+                // 添加 PendingHandlerCallback 回调
                 callHandlerCallbackLater(newCtx, true);
                 return this;
             }
 
+            // <2> 不在 EventLoop 的线程中，提交 EventLoop 中，执行回调用户方法
             EventExecutor executor = newCtx.executor();
             if (!executor.inEventLoop()) {
                 callHandlerAddedInEventLoop(newCtx, executor);
                 return this;
             }
         }
+        // <3> 回调 ChannelHandler added 事件
         callHandlerAdded0(newCtx);
         return this;
     }
@@ -385,17 +423,21 @@ public class DefaultChannelPipeline implements ChannelPipeline {
     }
 
     private String generateName(ChannelHandler handler) {
+        // 从缓存中查询，是否已经生成默认名字
         Map<Class<?>, String> cache = nameCaches.get();
         Class<?> handlerType = handler.getClass();
         String name = cache.get(handlerType);
+        // 若未生成过，进行生成
         if (name == null) {
             name = generateName0(handlerType);
             cache.put(handlerType, name);
         }
 
+        // 判断是否存在相同名字的节点
         // It's not very likely for a user to put more than one handler of the same type, but make sure to avoid
         // any name conflicts.  Note that we don't cache the names generated here.
         if (context0(name) != null) {
+            // 若存在，则使用基础名字 + 编号，循环生成，直到一个是唯一的
             String baseName = name.substring(0, name.length() - 1); // Strip the trailing '0'.
             for (int i = 1;; i ++) {
                 String newName = baseName + i;
@@ -1133,6 +1175,12 @@ public class DefaultChannelPipeline implements ChannelPipeline {
         }
     }
 
+    /**
+     * 设置 AbstractChannelHandlerContext 准备添加中
+     * 提交 EventLoop 中，执行回调 ChannelHandler added 事件
+     * @param newCtx
+     * @param executor
+     */
     private void callHandlerAddedInEventLoop(final AbstractChannelHandlerContext newCtx, EventExecutor executor) {
         newCtx.setAddPending();
         executor.execute(new Runnable() {

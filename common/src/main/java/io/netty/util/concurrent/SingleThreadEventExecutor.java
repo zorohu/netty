@@ -320,18 +320,25 @@ public abstract class SingleThreadEventExecutor extends AbstractScheduledEventEx
         }
     }
 
+    /**
+     * 将定时任务队列 scheduledTaskQueue 到达可执行的任务，添加到任务队列 taskQueue
+     * @return true 表示获取完所有可执行的定时任务
+     */
     private boolean fetchFromScheduledTaskQueue() {
         if (scheduledTaskQueue == null || scheduledTaskQueue.isEmpty()) {
             return true;
         }
         long nanoTime = AbstractScheduledEventExecutor.nanoTime();
         for (;;) {
+            // 不断从定时任务队列中，获得
+            // 获得指定时间内，定时任务队列**首个**可执行的任务，并且从队列中移除。
             Runnable scheduledTask = pollScheduledTask(nanoTime);
             if (scheduledTask == null) {
                 return true;
             }
             if (!taskQueue.offer(scheduledTask)) {
                 // No space left in the task queue add it back to the scheduledTaskQueue so we pick it up again.
+                // 任务队列中没有剩余空间，将其重新添加到ScheduledTaskQueue中，因此我们再次选择了它
                 scheduledTaskQueue.add((ScheduledFutureTask<?>) scheduledTask);
                 return false;
             }

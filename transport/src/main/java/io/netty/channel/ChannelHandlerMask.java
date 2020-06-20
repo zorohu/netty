@@ -32,6 +32,9 @@ import java.security.PrivilegedExceptionAction;
 import java.util.Map;
 import java.util.WeakHashMap;
 
+/**
+ * 解析当前 ChannelHandler 支持哪些回调方法
+ */
 final class ChannelHandlerMask {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(ChannelHandlerMask.class);
 
